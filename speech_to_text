@@ -1,15 +1,6 @@
 #!/bin/bash
 
-TESTRUN=NO
-BLOCK_SIZE=30
-WAV_DIR=/records
-TRANS_DIR=/records/trans
-LOG_DIR=/records/log
-GCLOUD_DIR="gs://hugme-wav"
-
-#TRANS_DIR=/home/adusers/hugme/Google-Speech-to-text/samples/trans
-#WAV_DIR=/home/adusers/hugme/Google-Speech-to-text/samples
-#LOG_DIR=/home/adusers/hugme/Google-Speech-to-text/samples/log
+. config
 
 transcribe_records() {
  WAV_FILE=$1
@@ -22,21 +13,27 @@ transcribe_records() {
  LFILE=$LFILE_DIR/${WAV_FILE/.wav/.log}
 
  #create the needed directories if it doesn't exist already
- [ ! -d $TFILE_DIR ] && mkdir $TFILE_DIR
  [ ! -d $LFILE_DIR ] && mkdir $LFILE_DIR
+ [ ! -d $TFILE_DIR ] && mkdir $TFILE_DIR
 
- [[ $TESTRUN == NO ]] && {
-  ## Send the file to google cloud, transcribe it then remove it
-  echo "Copy file to Google" >> $LFILE
-  gsutil cp $WFILE $GCLOUD_DIR >> $LFILE 2> $LFILE
-  echo -e "\nTranscribe and keep" >> $LFILE
-  gcloud ml speech recognize-long-running $GCLOUD_DIR/$WAV_FILE --language-code='en-US' > $TFILE 2>> $LFILE
-  echo -e "\nDelete file from google Drive" >> $LFILE
-  gsutil rm $GCLOUD_DIR/$WAV_FILE >> $LFILE 2>> $LFILE
+ [[ ! -e $TFILE ]] && touch $TFILE
+ [[ $(stat --printf="%s" $TFILE) == 0 ]] && {
+  [[ $TESTRUN == NO ]] && {
+   echo -ne "Starting Job $LOOP      "\\r
+   ## Send the file to google cloud, transcribe it then remove it
+   echo "Copy file to Google" >> $LFILE
+   gsutil cp $WFILE $GCLOUD_DIR >> $LFILE 2> $LFILE
+   echo -e "\nTranscribe and keep" >> $LFILE
+   gcloud ml speech recognize-long-running $GCLOUD_DIR/$WAV_FILE --language-code='en-US' > $TFILE 2>> $LFILE
+   echo -e "\nDelete file from google Drive" >> $LFILE
+   gsutil rm $GCLOUD_DIR/$WAV_FILE >> $LFILE 2>> $LFILE
+  } || {
+   echo "gsutil cp $WFILE $GCLOUD_DIR"
+   echo "gcloud ml speech recognize-long-running $GCLOUD_DIR/$WAV_FILE --language-code='en-US' > $TFILE"
+   echo "gsutil rm $GCLOUD_DIR/$WAV_FILE"
+  }
  } || {
-  echo "gsutil cp $WFILE $GCLOUD_DIR"
-  echo "gcloud ml speech recognize-long-running $GCLOUD_DIR/$WAV_FILE --language-code='en-US' > $TFILE"
-  echo "gsutil rm $GCLOUD_DIR/$WAV_FILE"
+   echo -ne "Skipping Job $LOOP      "\\r
  }
 }
 
@@ -47,7 +44,6 @@ while IFS="." read WAV ; do
  X=1
  while [[ $X == 1 ]] ; do
  [[ $(jobs|wc -l) -lt $BLOCK_SIZE ]] && {
-  echo -ne "Starting Job $LOOP      "\\r
   transcribe_records ${WAV##*/} & LOOP=$(($LOOP+1))
   X=0
  }

@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# If you want to see the Google ML commands. If you have a 
+# lot of files the output is going to be huge. Keep an eye
+# on your Google metrics, if the number of 429 errors starts
+# going way up you may want to lower this number.
+
+#TESTRUN=NO
+
+# How many subshells do you want to run at once? For 4 cores
+# am using 30 and load is high. For 32 cores I'm using 360 and
+# getting a medium load. test on your own machine
+
+#BLOCK_SIZE=30
+
+# Where are the wav files? It will search subdirectories too
+
+#WAV_DIR=/records/media
+
+# Where do you want it to put the results?
+
+#TRANS_DIR=/records/trans
+
+# Where do you want it to put the log files?
+
+#LOG_DIR=/records/log
+
+# What is the directory on your Google Storage you would like it to use?
+
+#GCLOUD_DIR="gs://records"
+
+TESTRUN=YES
+BLOCK_SIZE=30
+WAV_DIR=/records/media
+TRANS_DIR=/records/trans
+LOG_DIR=/records/log
+GCLOUD_DIR="gs://records"
+
