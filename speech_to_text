@@ -1,0 +1,64 @@
+#!/bin/bash
+
+TESTRUN=NO
+BLOCK_SIZE=30
+WAV_DIR=/records
+TRANS_DIR=/records/trans
+LOG_DIR=/records/log
+GCLOUD_DIR="gs://hugme-wav"
+
+#TRANS_DIR=/home/adusers/hugme/Google-Speech-to-text/samples/trans
+#WAV_DIR=/home/adusers/hugme/Google-Speech-to-text/samples
+#LOG_DIR=/home/adusers/hugme/Google-Speech-to-text/samples/log
+
+transcribe_records() {
+ WAV_FILE=$1
+ DIR_NAME=$(echo $WAV_FILE | cut -d "." -f 4  | cut -d "-" -f 1 )
+ TFILE_DIR=$TRANS_DIR/$DIR_NAME
+ TFILE=$TFILE_DIR/${WAV_FILE/.wav/.json}
+ WFILE_DIR=$WAV_DIR/$DIR_NAME
+ WFILE=$WFILE_DIR/$WAV_FILE
+ LFILE_DIR=$LOG_DIR/$DIR_NAME
+ LFILE=$LFILE_DIR/${WAV_FILE/.wav/.log}
+
+ #create the needed directories if it doesn't exist already
+ [ ! -d $TFILE_DIR ] && mkdir $TFILE_DIR
+ [ ! -d $LFILE_DIR ] && mkdir $LFILE_DIR
+
+ [[ $TESTRUN == NO ]] && {
+  ## Send the file to google cloud, transcribe it then remove it
+  echo "Copy file to Google" >> $LFILE
+  gsutil cp $WFILE $GCLOUD_DIR >> $LFILE 2> $LFILE
+  echo -e "\nTranscribe and keep" >> $LFILE
+  gcloud ml speech recognize-long-running $GCLOUD_DIR/$WAV_FILE --language-code='en-US' > $TFILE 2>> $LFILE
+  echo -e "\nDelete file from google Drive" >> $LFILE
+  gsutil rm $GCLOUD_DIR/$WAV_FILE >> $LFILE 2>> $LFILE
+ } || {
+  echo "gsutil cp $WFILE $GCLOUD_DIR"
+  echo "gcloud ml speech recognize-long-running $GCLOUD_DIR/$WAV_FILE --language-code='en-US' > $TFILE"
+  echo "gsutil rm $GCLOUD_DIR/$WAV_FILE"
+ }
+}
+
+echo Starting Run 
+
+LOOP=1
+while IFS="." read WAV ; do 
+ X=1
+ while [[ $X == 1 ]] ; do
+ [[ $(jobs|wc -l) -lt $BLOCK_SIZE ]] && {
+  echo -ne "Starting Job $LOOP      "\\r
+  transcribe_records ${WAV##*/} & LOOP=$(($LOOP+1))
+  X=0
+ }
+ done
+done< <(find $WAV_DIR -name "*.wav")
+
+echo "Completed sending Jobs"
+
+while [[ $(jobs|wc -l) -gt 1 ]] ; do
+ echo -ne "There are still $(jobs|wc -l) jobs remaining"\\r
+ sleep 5
+done
+
+echo complete
